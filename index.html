@@ -322,6 +322,24 @@ footer a{color:var(--text-dim);text-decoration:none;border-bottom:1px dotted var
           <div class="station-input-sub" id="st-month-display"></div>
         </div>
       </div>
+      <div class="station-input-row" style="margin-top:8px">
+        <div class="station-input-group">
+          <label class="station-input-label" for="st-input-ayer">Lluvia ayer (mm)</label>
+          <div class="station-input-wrap">
+            <input type="number" id="st-input-ayer" placeholder="0.0" step="0.1" min="0" inputmode="decimal">
+            <span class="station-input-unit">mm</span>
+          </div>
+          <div class="station-input-sub" id="st-ayer-sub" style="color:var(--warn)"></div>
+        </div>
+        <div class="station-input-group">
+          <label class="station-input-label" for="st-input-ant">Lluvia antesdeayer (mm)</label>
+          <div class="station-input-wrap">
+            <input type="number" id="st-input-ant" placeholder="0.0" step="0.1" min="0" inputmode="decimal">
+            <span class="station-input-unit">mm</span>
+          </div>
+          <div class="station-input-sub" id="st-ant-sub" style="color:var(--warn)"></div>
+        </div>
+      </div>
       <div class="meteo-local-actions" style="margin-top:8px">
         <button class="btn-station" id="btn-station-read" onclick="fetchAvamet()">☁ Leer AVAMET</button>
         <button class="btn-station" id="btn-station-apply" onclick="applyStationInput()" style="background:rgba(92,210,141,0.15);border-color:rgba(92,210,141,0.35);color:var(--accent)">✓ Aplicar</button>
@@ -676,7 +694,8 @@ function getEffectiveValues(){
   const tmaxOverride = parseFloat(document.getElementById('in-tmax').value);
   const rainOverride = parseFloat(document.getElementById('in-rain').value);
   const tmax  = !isNaN(tmaxOverride) ? tmaxOverride : (weather ? weather.tmax : 25);
-  // Prioridad lluvia: 1) override manual, 2) estación local meteoxabia, 3) Open-Meteo
+
+  // Prioridad lluvia hoy: 1) override manual, 2) estación local AVAMET, 3) Open-Meteo
   let rain;
   if(!isNaN(rainOverride)){
     rain = rainOverride;
@@ -685,10 +704,27 @@ function getEffectiveValues(){
   } else {
     rain = weather ? weather.rain : 0;
   }
-  const rain3 = weather ? weather.rain3 : 0;
+
+  // Prioridad lluvia 3 días previos: campos ayer/antesdeayer si están rellenos, si no Open-Meteo
+  const ayerVal = parseFloat(document.getElementById('st-input-ayer').value);
+  const antVal  = parseFloat(document.getElementById('st-input-ant').value);
+  let rain3, rain3Src;
+  const ayerOk = !isNaN(ayerVal) && ayerVal >= 0;
+  const antOk  = !isNaN(antVal)  && antVal  >= 0;
+  if(ayerOk || antOk){
+    // Usar estación local para los días que tengamos dato
+    const saved = loadStationCache();
+    const rainHoyPrev = (saved && saved.rainMM != null) ? saved.rainMM : (weather ? weather.rain : 0);
+    rain3 = (ayerOk ? ayerVal : 0) + (antOk ? antVal : 0);
+    rain3Src = 'Estación local';
+  } else {
+    rain3 = weather ? weather.rain3 : 0;
+    rain3Src = 'Open-Meteo';
+  }
+
   const wind  = weather ? weather.wind  : 20;
   const gust  = weather ? weather.gust  : 0;
-  return {tmax, rain, rain3, wind, gust};
+  return {tmax, rain, rain3, rain3Src, wind, gust};
 }
 
 function recompute(){
@@ -715,12 +751,26 @@ function recompute(){
   setFactor('f-wind',  factors.wind);
   setFactor('f-wash',  factors.wash);
 
-  // Mostrar fuente activa de lluvia
+  // Mostrar fuente activa de lluvia hoy
   const rainOverride = parseFloat(document.getElementById('in-rain').value);
   let rainSrc = 'Open-Meteo';
   if(!isNaN(rainOverride)) rainSrc = 'Override manual';
   else if(stationRainMM != null) rainSrc = 'Estación local';
   document.getElementById('m-rain-sub').textContent = `${v.rain.toFixed(1)} mm · ${rainSrc}`;
+
+  // Mostrar fuente y total de rain3
+  document.getElementById('m-rain3').textContent = v.rain3.toFixed(1);
+  document.getElementById('m-rain3-sub').textContent = `Acumulado · ${v.rain3Src||'Open-Meteo'}`;
+
+  // Sub-labels en campos ayer/antesdeayer
+  const ayerEl = document.getElementById('st-input-ayer');
+  const antEl  = document.getElementById('st-input-ant');
+  const ayerV = parseFloat(ayerEl.value);
+  const antV  = parseFloat(antEl.value);
+  document.getElementById('st-ayer-sub').textContent =
+    (!isNaN(ayerV) && ayerV > 0) ? `→ factor lluvia 3d incluye ${ayerV} mm` : '';
+  document.getElementById('st-ant-sub').textContent =
+    (!isNaN(antV) && antV > 0) ? `→ factor lluvia 3d incluye ${antV} mm` : '';
 
   // Interpretation
   let sub = '';
@@ -1223,7 +1273,11 @@ function initLog(){
 // Datos abiertos AVAMET (CC BY-NC-ND 4.0)
 // ============================================================
 const AVAMET_URL = 'https://www.avamet.org/mxo_i.php?id=c30m082e24';
-const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+const CORS_PROXIES = [
+  'https://corsproxy.io/?url=',
+  'https://api.allorigins.win/raw?url=',
+  'https://api.codetabs.com/v1/proxy?quest=',
+];
 
 async function fetchAvamet(){
   const btn = document.getElementById('btn-station-read');
@@ -1231,19 +1285,31 @@ async function fetchAvamet(){
   btn.textContent = '⏳ Leyendo…';
   setStationStatus('Consultando AVAMET…');
 
-  // Intentar primero directo, luego via proxy
+  // Comprobar caché reciente (30 min)
+  const saved = loadStationCache();
+  if(saved){
+    const ageMin = (Date.now() - (saved.appliedAt||0)) / 60000;
+    const todayStr = new Date().toISOString().slice(0,10);
+    if(saved.date === todayStr && ageMin < 30){
+      setInputsFromCache(saved);
+      applyStationInput(saved);
+      setStationStatus(`AVAMET · hace ${Math.round(ageMin)} min`);
+      btn.disabled = false; btn.textContent = '☁ Leer AVAMET';
+      return;
+    }
+  }
+
   let html = null;
-  const urls = [
-    AVAMET_URL,
-    CORS_PROXY + encodeURIComponent(AVAMET_URL),
-  ];
+
+  // Intentar directo primero, luego cada proxy
+  const urls = [AVAMET_URL, ...CORS_PROXIES.map(p => p + encodeURIComponent(AVAMET_URL))];
 
   for(const url of urls){
     try{
       const r = await fetch(url, {cache:'no-store'});
       if(r.ok){
-        html = await r.text();
-        if(html && html.length > 100) break;
+        const text = await r.text();
+        if(text && text.length > 200){ html = text; break; }
       }
     }catch(e){
       console.warn('fetchAvamet attempt failed:', e.message);
@@ -1333,25 +1399,40 @@ function saveStationCache(data){
   localStorage.setItem(STATION_CACHE_KEY, JSON.stringify(data));
 }
 
+function setInputsFromCache(data){
+  const inputMM = document.getElementById('st-input-mm');
+  const inputMonth = document.getElementById('st-input-month');
+  const inputAyer = document.getElementById('st-input-ayer');
+  const inputAnt  = document.getElementById('st-input-ant');
+  if(data.rainMM != null)    { inputMM.value    = data.rainMM;    inputMM.dispatchEvent(new Event('input')); }
+  if(data.rainMonthMM != null){ inputMonth.value = data.rainMonthMM; inputMonth.dispatchEvent(new Event('input')); }
+  if(data.rainAyer != null)  { inputAyer.value  = data.rainAyer; }
+  if(data.rainAnt  != null)  { inputAnt.value   = data.rainAnt;  }
+}
+
 function initStationPanel(){
+  // Listeners para recalcular al cambiar ayer/antesdeayer
+  document.getElementById('st-input-ayer').addEventListener('input', ()=>recompute());
+  document.getElementById('st-input-ant').addEventListener('input',  ()=>recompute());
   const inputMM    = document.getElementById('st-input-mm');
   const inputMonth = document.getElementById('st-input-month');
 
   // Restaurar último valor guardado
   const saved = loadStationCache();
-  if(saved){
-    // Solo prerellenar si es de hoy
-    const todayStr = new Date().toISOString().slice(0,10);
-    if(saved.date === todayStr){
-      if(saved.rainMM != null){ inputMM.value = saved.rainMM; }
-      if(saved.rainMonthMM != null){ inputMonth.value = saved.rainMonthMM; }
-      stationRainMM = saved.rainMM;
-      renderStationUI(saved);
-    } else {
-      // Día nuevo: mostrar mes anterior como referencia pero no prerellenar lluvia de hoy
-      if(saved.rainMonthMM != null){ inputMonth.value = saved.rainMonthMM; }
-      setStationStatus(`Datos de ${saved.date} — introduce lluvia de hoy`);
+  const todayStr = new Date().toISOString().slice(0,10);
+  if(saved && saved.date === todayStr){
+    setInputsFromCache(saved);
+    stationRainMM = saved.rainMM;
+    renderStationUI(saved);
+    // Si los datos tienen más de 30 min, refrescar en background
+    const ageMin = (Date.now() - (saved.appliedAt||0)) / 60000;
+    if(ageMin > 30) setTimeout(()=>fetchAvamet(), 2000);
+  } else {
+    // Sin datos de hoy — intentar AVAMET automáticamente al arrancar
+    if(saved && saved.rainMonthMM != null){
+      document.getElementById('st-input-month').value = saved.rainMonthMM;
     }
+    setTimeout(()=>fetchAvamet(), 1500);
   }
 
   // Actualizar sub-label en tiempo real al escribir
@@ -1377,6 +1458,8 @@ function applyStationInput(autoData){
   const inputMonth = document.getElementById('st-input-month');
   const mm    = autoData?.rainMM    ?? parseFloat(inputMM.value);
   const month = autoData?.rainMonthMM ?? parseFloat(inputMonth.value);
+  const ayer  = parseFloat(document.getElementById('st-input-ayer').value);
+  const ant   = parseFloat(document.getElementById('st-input-ant').value);
 
   if(isNaN(mm) || mm < 0){
     setStationStatus('Introduce un valor válido de mm');
@@ -1388,6 +1471,8 @@ function applyStationInput(autoData){
     date: todayStr,
     rainMM: mm,
     rainMonthMM: isNaN(month) ? null : month,
+    rainAyer: isNaN(ayer) ? null : ayer,
+    rainAnt:  isNaN(ant)  ? null : ant,
     appliedAt: Date.now()
   };
 
@@ -1414,8 +1499,8 @@ function renderStationUI(data){
 
   document.getElementById('station-note').textContent =
     data.rainMM > 0
-      ? `${data.rainMM} mm aplicados al cálculo (${mmToM3(data.rainMM).toLocaleString('es-ES')} m³). El override manual de la sección 02 tiene prioridad si lo rellenas.`
-      : `0 mm registrados — sin efecto de lluvia en el cálculo de hoy.`;
+      ? `${data.rainMM} mm hoy aplicados (${mmToM3(data.rainMM).toLocaleString('es-ES')} m³). Introduce lluvia de ayer y antesdeayer para afinar el factor de 3 días.`
+      : `0 mm hoy. Introduce lluvia de ayer y antesdeayer si las hubo para que el factor de 3 días sea correcto.`;
 }
 
 function setStationStatus(msg){
