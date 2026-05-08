@@ -308,6 +308,1598 @@ footer a{color:var(--text-dim);text-decoration:none;border-bottom:1px dotted var
         <div class="station-input-group">
           <label class="station-input-label" for="st-input-mm">Lluvia hoy en el campo (mm)</label>
           <div class="station-input-wrap">
+            <input type="number" id="st-input-mm" placeholder="—" step="0.1" min="0" inputmode="decimal">
+            <span class="station-input-unit">mm</span>
+          </div>
+          <div class="station-input-sub" id="st-rain-m3-display"></div>
+        </div>
+        <div class="station-input-group">
+          <label class="station-input-label" for="st-input-month">Lluvia mes (mm)</label>
+          <div class="station-input-wrap">
+            <input type="number" id="st-input-month" placeholder="—" step="0.1" min="0" inputmode="decimal">
+            <span class="station-input-unit">mm</span>
+          </div>
+          <div class="station-input-sub" id="st-month-display"></div>
+        </div>
+      </div>
+      <div class="station-input-row" style="margin-top:8px">
+        <div class="station-input-group">
+          <label class="station-input-label" for="st-input-ayer">Lluvia ayer (mm)</label>
+          <div class="station-input-wrap">
+            <input type="number" id="st-input-ayer" placeholder="—" step="0.1" min="0" inputmode="decimal">
+            <span class="station-input-unit">mm</span>
+          </div>
+          <div class="station-input-sub" id="st-ayer-sub" style="color:var(--warn)"></div>
+        </div>
+        <div class="station-input-group">
+          <label class="station-input-label" for="st-input-ant">Lluvia antesdeayer (mm)</label>
+          <div class="station-input-wrap">
+            <input type="number" id="st-input-ant" placeholder="—" step="0.1" min="0" inputmode="decimal">
+            <span class="station-input-unit">mm</span>
+          </div>
+          <div class="station-input-sub" id="st-ant-sub" style="color:var(--warn)"></div>
+        </div>
+      </div>
+      <div class="meteo-local-actions" style="margin-top:8px">
+        <button class="btn-station" id="btn-station-read" onclick="fetchAvamet()">☁ Leer AVAMET</button>
+        <button class="btn-station" id="btn-station-apply" onclick="applyStationInput()" style="background:rgba(92,210,141,0.15);border-color:rgba(92,210,141,0.35);color:var(--accent)">✓ Aplicar</button>
+        <a class="btn-station-link" href="https://www.avamet.org/mxo_i.php?id=c30m082e24" target="_blank">↗ AVAMET</a>
+      </div>
+      <div class="station-applied" id="station-applied">✓ Lluvia de la estación local aplicada al cálculo</div>
+      <div class="meteo-local-note" id="station-note">Pulsa "Leer AVAMET" para obtener automáticamente los datos de lluvia de la estación del Club de Golf. Si falla, abre AVAMET con el enlace, anota los mm e introdúcelos manualmente.</div>
+    </div>
+  </section>
+
+  <section class="fade-in">
+    <div class="section-title"><span class="num">02</span> Ajustes manuales</div>
+    <div class="inputs">
+      <div class="input-row">
+        <label>
+          Mes
+          <span class="hint">El de hoy salvo que planifiques otro día</span>
+        </label>
+        <select id="in-month"></select>
+      </div>
+      <div class="input-row">
+        <label>
+          Lavado de sales hoy
+          <span class="hint">Cada 3-4 semanas en verano (+12%)</span>
+        </label>
+        <div class="toggle">
+          <button data-val="0" class="active">No</button>
+          <button data-val="1">Sí</button>
+        </div>
+      </div>
+      <div class="input-row">
+        <label>
+          Override manual T máx (°C)
+          <span class="hint">Vacío = usar valor previsto</span>
+        </label>
+        <input type="number" id="in-tmax" placeholder="auto" step="0.5">
+      </div>
+      <div class="input-row">
+        <label>
+          Override manual lluvia hoy (mm)
+          <span class="hint">Vacío = estación local si disponible, si no Open-Meteo</span>
+        </label>
+        <input type="number" id="in-rain" placeholder="auto" step="0.1" min="0">
+      </div>
+    </div>
+  </section>
+
+  <section class="fade-in">
+    <div class="section-title"><span class="num">03</span> Recomendación</div>
+    <div class="result">
+      <div class="result-label">Riego sugerido hoy</div>
+      <div class="result-value"><span id="r-value">—</span><span class="unit">m³</span></div>
+      <div class="result-sub" id="r-sub">Calculando…</div>
+      <span class="result-pct" id="r-pct">—</span>
+      <div class="factors">
+        <div class="factor"><div class="factor-label">Lluvia hoy</div><div class="factor-value neutral" id="f-rain">×1.00</div></div>
+        <div class="factor"><div class="factor-label">Lluvia 3d</div><div class="factor-value neutral" id="f-rain3">×1.00</div></div>
+        <div class="factor"><div class="factor-label">Calor</div><div class="factor-value neutral" id="f-temp">×1.00</div></div>
+        <div class="factor"><div class="factor-label">Viento</div><div class="factor-value neutral" id="f-wind">×1.00</div></div>
+        <div class="factor"><div class="factor-label">Lavado</div><div class="factor-value neutral" id="f-wash">×1.00</div></div>
+        <div class="factor"><div class="factor-label">Base mes</div><div class="factor-value neutral" id="f-base">—</div></div>
+      </div>
+      <div class="alerts" id="alerts"></div>
+    </div>
+  </section>
+
+  <section class="fade-in">
+    <div class="section-title"><span class="num">04</span> Tabla base mensual</div>
+    <div class="month-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Mes</th>
+            <th class="num">m³/día</th>
+            <th class="num">Rango</th>
+            <th class="num">m³/mes</th>
+          </tr>
+        </thead>
+        <tbody id="month-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="fade-in">
+    <div class="section-title"><span class="num">05</span> Registro de riego real</div>
+    <div class="log-form">
+      <div class="log-row">
+        <label>
+          Fecha
+          <span class="hint">Día del que registras el consumo</span>
+        </label>
+        <input type="date" id="log-date">
+      </div>
+      <div class="log-row">
+        <label>
+          Lectura inicial (m³)
+          <span class="hint">Contador del día anterior <span id="log-prev-hint"></span></span>
+        </label>
+        <input type="number" id="log-start" placeholder="—" step="1" inputmode="decimal">
+      </div>
+      <div class="log-row">
+        <label>
+          Lectura final (m³)
+          <span class="hint">Contador de hoy</span>
+        </label>
+        <input type="number" id="log-end" placeholder="—" step="1" inputmode="decimal">
+      </div>
+      <div class="log-computed">
+        <span class="log-computed-label">Consumo del día</span>
+        <span class="log-computed-value"><span id="log-computed">0</span><span class="unit">m³</span></span>
+      </div>
+      <div class="log-actions">
+        <button class="btn-primary" id="log-save">Guardar</button>
+        <button class="btn-secondary" id="log-clear">Limpiar</button>
+      </div>
+      <div class="log-msg" id="log-msg"></div>
+    </div>
+
+    <div class="log-stats">
+      <div class="log-stat">
+        <div class="log-stat-label">Mes actual</div>
+        <div class="log-stat-value"><span id="stat-month">0</span><span class="unit">m³</span></div>
+        <div class="log-stat-sub" id="stat-month-days">— días</div>
+      </div>
+      <div class="log-stat">
+        <div class="log-stat-label">Año en curso</div>
+        <div class="log-stat-value"><span id="stat-year">0</span><span class="unit">m³</span></div>
+        <div class="log-stat-sub" id="stat-year-days">— días</div>
+      </div>
+      <div class="log-stat">
+        <div class="log-stat-label">Última lectura</div>
+        <div class="log-stat-value"><span id="stat-last">—</span></div>
+        <div class="log-stat-sub" id="stat-last-date">—</div>
+      </div>
+    </div>
+
+    <div class="log-month-view">
+      <div class="log-month-header">
+        <span class="log-month-title" id="log-month-title">—</span>
+        <div class="log-month-nav">
+          <button id="month-prev" title="Mes anterior">‹</button>
+          <button id="month-next" title="Mes siguiente">›</button>
+        </div>
+      </div>
+      <div class="log-month-summary">
+        <div class="log-month-summary-item">
+          <div class="log-month-summary-label">Consumo registrado</div>
+          <div class="log-month-summary-value"><span id="month-sum">0</span><span class="unit">m³</span></div>
+          <div class="log-month-summary-sub" id="month-sum-days">0 días con riego</div>
+        </div>
+        <div class="log-month-summary-item">
+          <div class="log-month-summary-label">vs. plan base</div>
+          <div class="log-month-summary-value" id="month-delta">—</div>
+          <div class="log-month-summary-sub" id="month-delta-pct">—</div>
+        </div>
+      </div>
+      <div class="log-list" id="log-list"></div>
+    </div>
+  </section>
+
+  <footer>
+    <p><strong>Datos meteorológicos:</strong> <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> (modelo ECMWF, resolución ~9 km). Actualiza cada hora.</p>
+    <p><strong>Estación local:</strong> <a href="https://www.avamet.org/mxo_i.php?id=c30m082e24" target="_blank">AVAMET · Club de Golf Jávea</a>. Datos abiertos (CC BY-NC-ND). Prioridad sobre Open-Meteo para lluvia del día.</p>
+    <p><strong>Calibración:</strong> Promedio de consumo real 2024-2025 (~83.000 m³/año) con factores de ajuste por lluvia, calor, viento y lavado.</p>
+    <p><strong>Importante:</strong> Esta herramienta es orientativa. Decisión final siempre basada en observación directa del campo y datos de sondas si las hay.</p>
+    <p style="margin-top:12px;color:var(--text-faint)">Funciona offline tras la primera carga · Datos meteo cacheados · Registros guardados en el dispositivo</p>
+  </footer>
+</div>
+
+<div class="install-banner" id="install-banner">
+  <span>📱 Añade esta app a tu pantalla de inicio</span>
+  <button id="btn-install">Cómo</button>
+  <button class="close" id="btn-close-install">×</button>
+</div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+// Ubicación exacta del Club de Golf Xàbia (Ctra. Jávea-Benitachell km 4,5)
+const LAT = 38.7456;
+const LON = 0.1498;
+const TIMEZONE = 'Europe/Madrid';
+const CACHE_KEY = 'riego_meteo_v2';  // v2: coordenadas Club Golf Xàbia
+const CACHE_TTL_MIN = 60;
+
+// Tabla base m³/día (promedio 2024-2025)
+const MONTHS = [
+  {n:'Enero',     base:0,   min:0,   max:0,   mes:'0',          peak:false},
+  {n:'Febrero',   base:35,  min:0,   max:70,  mes:'0–1.950',    peak:false},
+  {n:'Marzo',     base:140, min:100, max:180, mes:'3.000–5.000',peak:false},
+  {n:'Abril',     base:300, min:280, max:320, mes:'8.500–9.500',peak:false},
+  {n:'Mayo',      base:330, min:310, max:350, mes:'9.500–10.800',peak:false},
+  {n:'Junio',     base:490, min:470, max:510, mes:'14.000–15.300',peak:true},
+  {n:'Julio',     base:490, min:450, max:530, mes:'14.000–16.500',peak:true},
+  {n:'Agosto',    base:475, min:460, max:490, mes:'14.300–15.200',peak:true},
+  {n:'Septiembre',base:285, min:240, max:330, mes:'7.200–10.000',peak:false},
+  {n:'Octubre',   base:230, min:200, max:260, mes:'6.000–8.000',peak:false},
+  {n:'Noviembre', base:0,   min:0,   max:0,   mes:'0',          peak:false},
+  {n:'Diciembre', base:0,   min:0,   max:0,   mes:'0',          peak:false},
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let weather = null;
+let washing = false;
+let manualMonth = new Date().getMonth(); // 0-11
+
+// ============================================================
+// FACTOR LOGIC (same as Excel calculator)
+// ============================================================
+function fRain(mm){       // lluvia día
+  if(mm >= 15) return 0;
+  if(mm >= 5)  return 0.30;
+  if(mm >= 2)  return 0.70;
+  return 1.0;
+}
+function fRain3(mm){      // lluvia 3 días previos
+  if(mm >= 30) return 0.70;
+  if(mm >= 15) return 0.85;
+  return 1.0;
+}
+function fTemp(t){        // temperatura máxima
+  if(t >= 35) return 1.20;
+  if(t >= 32) return 1.12;
+  if(t >= 28) return 1.00;
+  if(t >= 22) return 0.95;
+  return 0.90;
+}
+function fWind(w){        // viento km/h
+  if(w >= 60) return 1.15;
+  if(w >= 40) return 1.08;
+  return 1.0;
+}
+function fWash(on){ return on ? 1.12 : 1.0; }
+
+// ============================================================
+// WEATHER FETCH
+// ============================================================
+async function fetchWeather(forceRefresh = false){
+  // Try cache first
+  if(!forceRefresh){
+    const cached = localStorage.getItem(CACHE_KEY);
+    if(cached){
+      try{
+        const obj = JSON.parse(cached);
+        const ageMin = (Date.now() - obj.ts) / 60000;
+        if(ageMin < CACHE_TTL_MIN){
+          weather = obj.data;
+          updateWeatherUI(weather, ageMin, true);
+          recompute();
+          return;
+        }
+      }catch(e){}
+    }
+  }
+
+  setStatus('Consultando previsión…','live');
+
+  const url = `https://api.open-meteo.com/v1/forecast?` +
+    `latitude=${LAT}&longitude=${LON}` +
+    `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,et0_fao_evapotranspiration,precipitation_probability_max` +
+    `&past_days=3&forecast_days=2` +
+    `&timezone=${encodeURIComponent(TIMEZONE)}`;
+
+  try{
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+
+    // past_days=3 + forecast_days=2 → 5 days. Today is index 3.
+    const todayIdx = 3;
+    const w = {
+      tmax: data.daily.temperature_2m_max[todayIdx],
+      tmin: data.daily.temperature_2m_min[todayIdx],
+      rain: data.daily.precipitation_sum[todayIdx],
+      rainProb: data.daily.precipitation_probability_max[todayIdx],
+      wind: data.daily.wind_speed_10m_max[todayIdx],
+      gust: data.daily.wind_gusts_10m_max[todayIdx],
+      et0: data.daily.et0_fao_evapotranspiration[todayIdx],
+      rain3: (data.daily.precipitation_sum[0]||0) +
+             (data.daily.precipitation_sum[1]||0) +
+             (data.daily.precipitation_sum[2]||0),
+      date: data.daily.time[todayIdx],
+      tomorrowRain: data.daily.precipitation_sum[todayIdx+1] || 0,
+      tomorrowTmax: data.daily.temperature_2m_max[todayIdx+1] || null,
+    };
+
+    weather = w;
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), data:w}));
+    updateWeatherUI(w, 0, false);
+    recompute();
+  }catch(err){
+    console.warn('fetchWeather:', err.message);
+    // Fallback to old cache if available
+    const cached = localStorage.getItem(CACHE_KEY);
+    if(cached){
+      try{
+        const obj = JSON.parse(cached);
+        const ageMin = (Date.now() - obj.ts) / 60000;
+        weather = obj.data;
+        updateWeatherUI(weather, ageMin, true);
+        setStatus('Sin conexión · datos cacheados','error');
+        recompute();
+        return;
+      }catch(e){}
+    }
+    setStatus('Sin red · introduce datos manualmente','error');
+    weather = null;
+    document.querySelectorAll('.skeleton').forEach(el=>el.classList.remove('skeleton'));
+    ['m-tmax','m-tmin','m-rain','m-rain3','m-wind'].forEach(id=>document.getElementById(id).textContent='—');
+    document.getElementById('m-rain-sub').textContent = 'Sin conexión — usa override manual';
+    recompute();
+  }
+}
+
+function setStatus(text, type){
+  document.getElementById('status-text').textContent = text;
+  const dot = document.getElementById('status-dot');
+  dot.className = 'dot ' + (type||'');
+}
+
+function updateWeatherUI(w, ageMin, isCached){
+  document.querySelectorAll('.skeleton').forEach(el=>el.classList.remove('skeleton'));
+  document.getElementById('m-tmax').textContent = w.tmax.toFixed(1);
+  document.getElementById('m-tmin').textContent = w.tmin.toFixed(1);
+  document.getElementById('m-rain').textContent = w.rain.toFixed(1);
+  document.getElementById('m-rain3').textContent = w.rain3.toFixed(1);
+  document.getElementById('m-wind').textContent = w.wind.toFixed(0);
+
+  document.getElementById('m-temp-sub').textContent = w.et0!=null ? `ET₀ ${w.et0.toFixed(1)} mm` : '';
+  document.getElementById('m-rain-sub').textContent = w.rainProb!=null ? `Prob. ${w.rainProb}%` : '';
+  document.getElementById('m-rain3-sub').textContent = 'Acumulado';
+  document.getElementById('m-wind-sub').textContent = w.gust ? `rachas ${w.gust.toFixed(0)}` : '';
+
+  const date = new Date(w.date);
+  const fmt = date.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('forecast-day').textContent = fmt.charAt(0).toUpperCase()+fmt.slice(1);
+
+  if(isCached){
+    setStatus(`Cacheado · ${Math.round(ageMin)} min`, ageMin>120?'error':'');
+  }else{
+    setStatus('Actualizado · en línea', 'live');
+  }
+}
+
+// ============================================================
+// COMPUTE & RENDER
+// ============================================================
+function getEffectiveValues(){
+  const tmaxOverride = parseFloat(document.getElementById('in-tmax').value);
+  const rainOverride = parseFloat(document.getElementById('in-rain').value);
+  const tmax  = !isNaN(tmaxOverride) ? tmaxOverride : (weather ? weather.tmax : 25);
+
+  // Prioridad lluvia hoy: 1) override manual, 2) estación local AVAMET, 3) Open-Meteo
+  let rain;
+  if(!isNaN(rainOverride)){
+    rain = rainOverride;
+  } else if(stationRainMM != null){
+    rain = stationRainMM;
+  } else {
+    rain = weather ? weather.rain : 0;
+  }
+
+  // Prioridad lluvia 3 días previos: campos ayer/antesdeayer si están rellenos, si no Open-Meteo
+  const ayerVal = parseFloat(document.getElementById('st-input-ayer').value);
+  const antVal  = parseFloat(document.getElementById('st-input-ant').value);
+  let rain3, rain3Src;
+  const ayerOk = !isNaN(ayerVal) && ayerVal >= 0;
+  const antOk  = !isNaN(antVal)  && antVal  >= 0;
+  if(ayerOk || antOk){
+    // Usar estación local para los días que tengamos dato
+    const saved = loadStationCache();
+    const rainHoyPrev = (saved && saved.rainMM != null) ? saved.rainMM : (weather ? weather.rain : 0);
+    rain3 = (ayerOk ? ayerVal : 0) + (antOk ? antVal : 0);
+    rain3Src = 'Estación local';
+  } else {
+    rain3 = weather ? weather.rain3 : 0;
+    rain3Src = 'Open-Meteo';
+  }
+
+  const wind  = weather ? weather.wind  : 20;
+  const gust  = weather ? weather.gust  : 0;
+  return {tmax, rain, rain3, rain3Src, wind, gust};
+}
+
+function recompute(){
+  const m = MONTHS[manualMonth];
+  const v = getEffectiveValues();
+  const factors = {
+    rain:  fRain(v.rain),
+    rain3: fRain3(v.rain3),
+    temp:  fTemp(v.tmax),
+    wind:  fWind(v.wind),
+    wash:  fWash(washing),
+  };
+  const result = Math.round(m.base * factors.rain * factors.rain3 * factors.temp * factors.wind * factors.wash);
+  const pct = m.base>0 ? (result/m.base) : 0;
+
+  document.getElementById('r-value').textContent = result.toLocaleString('es-ES');
+  document.getElementById('r-pct').textContent = m.base>0 ? `${Math.round(pct*100)}% del base` : 'Mes sin riego';
+  document.getElementById('f-base').textContent = m.base + ' m³';
+  document.getElementById('f-base').className = 'factor-value neutral';
+
+  setFactor('f-rain',  factors.rain);
+  setFactor('f-rain3', factors.rain3);
+  setFactor('f-temp',  factors.temp);
+  setFactor('f-wind',  factors.wind);
+  setFactor('f-wash',  factors.wash);
+
+  // Mostrar fuente activa de lluvia hoy
+  const rainOverride = parseFloat(document.getElementById('in-rain').value);
+  let rainSrc = 'Open-Meteo';
+  if(!isNaN(rainOverride)) rainSrc = 'Override manual';
+  else if(stationRainMM != null) rainSrc = 'Estación local';
+  document.getElementById('m-rain-sub').textContent = `${v.rain.toFixed(1)} mm · ${rainSrc}`;
+
+  // Mostrar fuente y total de rain3
+  document.getElementById('m-rain3').textContent = v.rain3.toFixed(1);
+  document.getElementById('m-rain3-sub').textContent = `Acumulado · ${v.rain3Src||'Open-Meteo'}`;
+
+  // Sub-labels en campos ayer/antesdeayer
+  const ayerEl = document.getElementById('st-input-ayer');
+  const antEl  = document.getElementById('st-input-ant');
+  const ayerV = parseFloat(ayerEl.value);
+  const antV  = parseFloat(antEl.value);
+  document.getElementById('st-ayer-sub').textContent =
+    (!isNaN(ayerV) && ayerV > 0) ? `→ factor lluvia 3d incluye ${ayerV} mm` : '';
+  document.getElementById('st-ant-sub').textContent =
+    (!isNaN(antV) && antV > 0) ? `→ factor lluvia 3d incluye ${antV} mm` : '';
+
+  // Interpretation
+  let sub = '';
+  if(m.base === 0) sub = 'Mes fuera de temporada de riego';
+  else if(result === 0) sub = 'No regar — lluvia suficiente';
+  else if(pct < 0.5) sub = 'Riego muy reducido por lluvia';
+  else if(pct < 0.85) sub = 'Riego reducido';
+  else if(pct <= 1.05) sub = 'Riego normal para el mes';
+  else if(pct <= 1.15) sub = 'Riego incrementado por calor / viento';
+  else sub = 'Riego máximo — condiciones extremas';
+  document.getElementById('r-sub').textContent = sub;
+
+  renderAlerts(v, factors, m);
+  renderMonthTable();
+}
+
+function setFactor(id, val){
+  const el = document.getElementById(id);
+  el.textContent = '×' + val.toFixed(2);
+  el.className = 'factor-value ' + (val > 1.01 ? 'up' : val < 0.99 ? 'down' : 'neutral');
+}
+
+function renderAlerts(v, factors, m){
+  const alerts = [];
+  if(v.wind >= 40){
+    alerts.push({type:'warn', title:'Viento fuerte', msg:'Regar de madrugada (3h–6h) para evitar pérdidas por evaporación y deriva.'});
+  }
+  if(v.gust && v.gust >= 60){
+    alerts.push({type:'warn', title:'Rachas muy fuertes', msg:`Rachas previstas de ${v.gust.toFixed(0)} km/h. Considerar parar aspersores en las horas centrales si la cobertura se ve afectada.`});
+  }
+  if(v.tmax >= 32){
+    alerts.push({type:'warn', title:'Calor intenso', msg:'Vigilar greens al atardecer; pase corto extra (5–8 min) si muestran estrés visible.'});
+  }
+  if(manualMonth >= 5 && manualMonth <= 8 && v.rain3 < 5 && !washing){
+    alerts.push({type:'info', title:'Recordatorio sales', msg:'Verano sin lluvias recientes. Revisar CE del agua y planificar lavado en los próximos días.'});
+  }
+  if(weather && weather.tomorrowRain >= 10){
+    alerts.push({type:'info', title:'Lluvia mañana', msg:`Previsión de ${weather.tomorrowRain.toFixed(1)} mm mañana. Considerar reducir o parar el riego de hoy.`});
+  }
+  if(v.rain >= 30){
+    alerts.push({type:'info', title:'Lluvia abundante', msg:'Tras la lluvia, valorar también parar mañana según infiltración real en suelo.'});
+  }
+  if(m.base === 0 && v.tmax > 18){
+    alerts.push({type:'info', title:'Mes sin riego programado', msg:'El plan no contempla riego este mes, pero si hay ola de calor seca prolongada conviene observar el campo.'});
+  }
+  const container = document.getElementById('alerts');
+  if(alerts.length === 0){
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = alerts.map(a=>
+    `<div class="alert ${a.type}"><strong>${a.title}</strong>${a.msg}</div>`
+  ).join('');
+}
+
+function renderMonthTable(){
+  const body = document.getElementById('month-body');
+  body.innerHTML = MONTHS.map((m,i)=>{
+    const cls = [];
+    if(i === manualMonth) cls.push('current');
+    else if(m.peak) cls.push('peak');
+    return `<tr class="${cls.join(' ')}"><td>${m.n}</td><td class="num">${m.base}</td><td class="num">${m.min}–${m.max}</td><td class="num">${m.mes}</td></tr>`;
+  }).join('');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function initMonthSelect(){
+  const sel = document.getElementById('in-month');
+  sel.innerHTML = MONTHS.map((m,i)=>
+    `<option value="${i}" ${i===manualMonth?'selected':''}>${m.n}</option>`
+  ).join('');
+  sel.addEventListener('change', e=>{ manualMonth = parseInt(e.target.value); recompute(); });
+}
+
+function initToggle(){
+  document.querySelectorAll('.toggle button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      washing = btn.dataset.val === '1';
+      recompute();
+    });
+  });
+}
+
+function initInputs(){
+  ['in-tmax','in-rain'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', ()=>recompute());
+  });
+}
+
+function initRefresh(){
+  document.getElementById('btn-refresh').addEventListener('click', ()=>fetchWeather(true));
+}
+
+function initInstallBanner(){
+  // Show on iOS Safari first visit (since beforeinstallprompt is Chrome-only)
+  const dismissed = localStorage.getItem('install_dismissed');
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if(!dismissed && !isStandalone){
+    setTimeout(()=>{
+      document.getElementById('install-banner').classList.add('show');
+    }, 3000);
+  }
+  document.getElementById('btn-install').addEventListener('click', ()=>{
+    const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if(isiOS){
+      alert('Para instalar en iPhone:\n1. Toca el botón Compartir (cuadrado con flecha)\n2. Desplázate y elige "Añadir a pantalla de inicio"\n3. Toca "Añadir"');
+    }else{
+      alert('Para instalar:\n1. Abre el menú del navegador (⋮ o •••)\n2. Elige "Añadir a pantalla de inicio" o "Instalar app"');
+    }
+  });
+  document.getElementById('btn-close-install').addEventListener('click', ()=>{
+    document.getElementById('install-banner').classList.remove('show');
+    localStorage.setItem('install_dismissed','1');
+  });
+}
+
+// Service worker for offline (inline registration)
+function initServiceWorker(){
+  if(!('serviceWorker' in navigator)) return;
+  // Inline SW via Blob URL
+  const swCode = `
+    const CACHE = 'riego-v1';
+    self.addEventListener('install', e => {
+      self.skipWaiting();
+    });
+    self.addEventListener('activate', e => {
+      self.clients.claim();
+    });
+    self.addEventListener('fetch', e => {
+      // Network-first for API, cache fallback otherwise
+      if(e.request.url.includes('open-meteo.com')){
+        e.respondWith(fetch(e.request).catch(()=>new Response('{"error":"offline"}',{headers:{'Content-Type':'application/json'}})));
+        return;
+      }
+      e.respondWith(
+        caches.open(CACHE).then(cache =>
+          cache.match(e.request).then(cached =>
+            cached || fetch(e.request).then(resp=>{
+              if(resp.ok && e.request.method==='GET') cache.put(e.request, resp.clone());
+              return resp;
+            }).catch(()=>cached)
+          )
+        )
+      );
+    });
+  `;
+  // Note: SW needs to be registered from same origin with file:// or http(s)://
+  // For local file:// it won't work, but on a hosted page it will
+  try{
+    const blob = new Blob([swCode], {type:'application/javascript'});
+    // Service workers can't be registered from blob URLs in most browsers,
+    // so we skip if not on http/https. The page still works fine without SW
+    // — the localStorage cache covers offline meteo data.
+    if(location.protocol === 'https:' || location.hostname === 'localhost'){
+      // Would need an actual sw.js file. For a self-contained file we rely on localStorage.
+    }
+  }catch(e){}
+}
+
+// ============================================================
+// IRRIGATION LOG
+// ============================================================
+const LOG_KEY = 'riego_log_v1';
+
+function loadLog(){
+  try{
+    const raw = localStorage.getItem(LOG_KEY);
+    return raw ? JSON.parse(raw) : {};
+  }catch(e){ return {}; }
+}
+
+function saveLog(log){
+  localStorage.setItem(LOG_KEY, JSON.stringify(log));
+}
+
+function todayISO(){
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function previousDayISO(iso){
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate()-1);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function formatDateShort(iso){
+  const d = new Date(iso + 'T12:00:00');
+  return d.toLocaleDateString('es-ES',{day:'2-digit',month:'short'});
+}
+
+function formatDateLong(iso){
+  const d = new Date(iso + 'T12:00:00');
+  const s = d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+
+function formatNum(n){
+  return Math.round(n).toLocaleString('es-ES');
+}
+
+// State for the month being viewed
+let viewYear = new Date().getFullYear();
+let viewMonth = new Date().getMonth();   // 0-11
+
+function refreshLogUI(){
+  const log = loadLog();
+  const entries = Object.values(log).sort((a,b) => a.date.localeCompare(b.date));
+
+  // Update prev hint with last reading
+  updatePrevHint();
+
+  // Update computed
+  updateComputed();
+
+  // Stats
+  const today = todayISO();
+  const now = new Date(today + 'T12:00:00');
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth();
+
+  let monthSum = 0, monthDays = 0;
+  let yearSum = 0, yearDays = 0;
+  for(const e of entries){
+    const d = new Date(e.date + 'T12:00:00');
+    if(d.getFullYear() === curYear){
+      yearSum += e.m3;
+      if(e.m3 > 0) yearDays++;
+      if(d.getMonth() === curMonth){
+        monthSum += e.m3;
+        if(e.m3 > 0) monthDays++;
+      }
+    }
+  }
+
+  document.getElementById('stat-month').textContent = formatNum(monthSum);
+  document.getElementById('stat-month-days').textContent = `${monthDays} día${monthDays===1?'':'s'} con riego`;
+  document.getElementById('stat-year').textContent = formatNum(yearSum);
+  document.getElementById('stat-year-days').textContent = `${yearDays} día${yearDays===1?'':'s'} con riego`;
+
+  if(entries.length > 0){
+    const last = entries[entries.length-1];
+    document.getElementById('stat-last').textContent = formatNum(last.end);
+    document.getElementById('stat-last-date').textContent = formatDateShort(last.date);
+  }else{
+    document.getElementById('stat-last').textContent = '—';
+    document.getElementById('stat-last-date').textContent = 'Sin datos';
+  }
+
+  // Monthly view
+  renderMonthView(entries);
+}
+
+function renderMonthView(entries){
+  const monthName = MONTHS[viewMonth].n;
+  document.getElementById('log-month-title').textContent = `${monthName} ${viewYear}`;
+
+  // Filter entries to this month
+  const monthEntries = entries.filter(e=>{
+    const d = new Date(e.date + 'T12:00:00');
+    return d.getFullYear() === viewYear && d.getMonth() === viewMonth;
+  });
+
+  // Sum
+  const sum = monthEntries.reduce((s,e)=>s+e.m3, 0);
+  const daysWithRiego = monthEntries.filter(e=>e.m3>0).length;
+  document.getElementById('month-sum').textContent = formatNum(sum);
+  document.getElementById('month-sum-days').textContent = `${daysWithRiego} día${daysWithRiego===1?'':'s'} con riego`;
+
+  // Compare with plan base
+  const baseDay = MONTHS[viewMonth].base;
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  const baseMonthly = baseDay * daysInMonth;
+  const deltaEl = document.getElementById('month-delta');
+  const deltaPctEl = document.getElementById('month-delta-pct');
+
+  if(baseMonthly === 0){
+    deltaEl.textContent = '—';
+    deltaEl.className = 'log-month-summary-value delta-eq';
+    deltaPctEl.textContent = 'Mes sin riego programado';
+  }else{
+    const diff = sum - baseMonthly;
+    const pct = sum / baseMonthly;
+    const sign = diff >= 0 ? '+' : '−';
+    deltaEl.innerHTML = `${sign}${formatNum(Math.abs(diff))}<span class="unit">m³</span>`;
+    deltaEl.className = 'log-month-summary-value ' + (diff > 100 ? 'delta-up' : diff < -100 ? 'delta-down' : 'delta-eq');
+    deltaPctEl.textContent = `${Math.round(pct*100)}% del plan (${formatNum(baseMonthly)} m³)`;
+  }
+
+  // List
+  const listEl = document.getElementById('log-list');
+  if(monthEntries.length === 0){
+    listEl.innerHTML = '<div class="log-list-empty">Sin registros este mes</div>';
+  }else{
+    // Sort newest first
+    const sorted = [...monthEntries].sort((a,b)=>b.date.localeCompare(a.date));
+    listEl.innerHTML = sorted.map(e=>{
+      const d = new Date(e.date + 'T12:00:00');
+      const day = d.getDate();
+      const wd = d.toLocaleDateString('es-ES',{weekday:'short'}).replace('.','');
+      return `<div class="log-entry">
+        <div class="log-entry-date"><strong>${day}</strong>${wd}</div>
+        <div class="log-entry-counters">${formatNum(e.start)} → ${formatNum(e.end)}</div>
+        <div class="log-entry-m3 ${e.m3===0?'zero':''}">${formatNum(e.m3)} m³</div>
+        <button class="log-entry-del" data-date="${e.date}" title="Borrar">×</button>
+      </div>`;
+    }).join('');
+
+    // Bind delete buttons
+    listEl.querySelectorAll('.log-entry-del').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const date = btn.dataset.date;
+        if(confirm(`¿Borrar el registro del ${formatDateLong(date)}?`)){
+          const log = loadLog();
+          delete log[date];
+          saveLog(log);
+          refreshLogUI();
+        }
+      });
+    });
+  }
+
+  // Disable next button if viewing current or future month
+  const now = new Date();
+  const isFuture = viewYear > now.getFullYear() || (viewYear === now.getFullYear() && viewMonth >= now.getMonth());
+  document.getElementById('month-next').disabled = isFuture;
+}
+
+function updatePrevHint(){
+  const dateInput = document.getElementById('log-date');
+  const date = dateInput.value || todayISO();
+  const log = loadLog();
+  const prevDate = previousDayISO(date);
+  const prev = log[prevDate];
+  const hintEl = document.getElementById('log-prev-hint');
+  if(prev){
+    hintEl.textContent = `· ${formatDateShort(prevDate)}: ${formatNum(prev.end)}`;
+  }else{
+    // Find most recent entry before this date
+    const entries = Object.values(log).filter(e => e.date < date).sort((a,b)=>b.date.localeCompare(a.date));
+    if(entries.length > 0){
+      hintEl.textContent = `· última: ${formatDateShort(entries[0].date)} (${formatNum(entries[0].end)})`;
+    }else{
+      hintEl.textContent = '';
+    }
+  }
+}
+
+function autofillStart(){
+  // If start field is empty and we have a previous reading, prefill it
+  const dateInput = document.getElementById('log-date');
+  const startInput = document.getElementById('log-start');
+  if(startInput.value !== '') return;
+  const date = dateInput.value || todayISO();
+  const log = loadLog();
+  const prevDate = previousDayISO(date);
+  let prev = log[prevDate];
+  if(!prev){
+    // Find most recent before
+    const entries = Object.values(log).filter(e => e.date < date).sort((a,b)=>b.date.localeCompare(a.date));
+    if(entries.length > 0) prev = entries[0];
+  }
+  if(prev){
+    startInput.value = prev.end;
+    startInput.placeholder = String(prev.end);
+  }
+}
+
+function updateComputed(){
+  const start = parseFloat(document.getElementById('log-start').value);
+  const end = parseFloat(document.getElementById('log-end').value);
+  const out = document.getElementById('log-computed');
+  if(!isNaN(start) && !isNaN(end)){
+    const diff = end - start;
+    out.textContent = formatNum(diff);
+    out.style.color = diff < 0 ? 'var(--danger)' : 'var(--text)';
+  }else{
+    out.textContent = '0';
+    out.style.color = 'var(--text)';
+  }
+}
+
+function showLogMsg(text, type){
+  const el = document.getElementById('log-msg');
+  el.textContent = text;
+  el.className = 'log-msg show ' + type;
+  setTimeout(()=>el.classList.remove('show'), 3500);
+}
+
+function saveLogEntry(){
+  const date = document.getElementById('log-date').value || todayISO();
+  const start = parseFloat(document.getElementById('log-start').value);
+  const end = parseFloat(document.getElementById('log-end').value);
+
+  if(isNaN(start) || isNaN(end)){
+    showLogMsg('Introduce ambas lecturas del contador', 'error');
+    return;
+  }
+  if(end < start){
+    showLogMsg('La lectura final no puede ser menor que la inicial', 'error');
+    return;
+  }
+
+  const m3 = end - start;
+  const log = loadLog();
+
+  // Sanity check: warn if huge value
+  if(m3 > 2000){
+    if(!confirm(`Consumo de ${formatNum(m3)} m³ en un día parece muy alto. ¿Confirmas que las lecturas son correctas?`)){
+      return;
+    }
+  }
+
+  // Sanity check: continuity with previous day
+  const prevDate = previousDayISO(date);
+  if(log[prevDate] && Math.abs(log[prevDate].end - start) > 0.5){
+    if(!confirm(`La lectura inicial (${formatNum(start)}) no coincide con la final del día anterior (${formatNum(log[prevDate].end)}). ¿Guardar igualmente?`)){
+      return;
+    }
+  }
+
+  // Overwrite warning
+  if(log[date]){
+    if(!confirm(`Ya hay un registro para ${formatDateLong(date)}. ¿Sobrescribir?`)){
+      return;
+    }
+  }
+
+  log[date] = {date, start, end, m3, savedAt: Date.now()};
+  saveLog(log);
+
+  // Reset form for next day
+  document.getElementById('log-start').value = '';
+  document.getElementById('log-end').value = '';
+  // Move date to today + 1 if user was logging today, else just clear
+  document.getElementById('log-date').value = todayISO();
+
+  showLogMsg(`✓ Guardado: ${formatNum(m3)} m³ el ${formatDateShort(date)}`, 'success');
+  refreshLogUI();
+}
+
+function clearLogForm(){
+  document.getElementById('log-start').value = '';
+  document.getElementById('log-end').value = '';
+  document.getElementById('log-date').value = todayISO();
+  updateComputed();
+  updatePrevHint();
+  autofillStart();
+}
+
+function initLog(){
+  // Set default date to today
+  document.getElementById('log-date').value = todayISO();
+
+  // Bindings
+  document.getElementById('log-date').addEventListener('change', ()=>{
+    updatePrevHint();
+    document.getElementById('log-start').value = '';
+    autofillStart();
+    updateComputed();
+  });
+  document.getElementById('log-start').addEventListener('input', updateComputed);
+  document.getElementById('log-end').addEventListener('input', updateComputed);
+  document.getElementById('log-save').addEventListener('click', saveLogEntry);
+  document.getElementById('log-clear').addEventListener('click', clearLogForm);
+
+  document.getElementById('month-prev').addEventListener('click', ()=>{
+    viewMonth--;
+    if(viewMonth < 0){ viewMonth = 11; viewYear--; }
+    refreshLogUI();
+  });
+  document.getElementById('month-next').addEventListener('click', ()=>{
+    const now = new Date();
+    const isCurrent = viewYear === now.getFullYear() && viewMonth >= now.getMonth();
+    if(isCurrent) return;
+    viewMonth++;
+    if(viewMonth > 11){ viewMonth = 0; viewYear++; }
+    refreshLogUI();
+  });
+
+  // Autofill on first load
+  autofillStart();
+  refreshLogUI();
+}
+
+// ============================================================
+// ============================================================
+// AVAMET — LECTURA AUTOMÁTICA ESTACIÓN CLUB DE GOLF JÁVEA
+// URL: https://www.avamet.org/mxo_i.php?id=c30m082e24
+// Datos abiertos AVAMET (CC BY-NC-ND 4.0)
+// ============================================================
+const AVAMET_URL = 'https://www.avamet.org/mxo_i.php?id=c30m082e24';
+const CORS_PROXIES = [
+  'https://corsproxy.io/?url=',
+  'https://api.allorigins.win/raw?url=',
+  'https://api.codetabs.com/v1/proxy?quest=',
+];
+
+async function fetchAvamet(){
+  const btn = document.getElementById('btn-station-read');
+  btn.disabled = true;
+  btn.textContent = '⏳ Leyendo…';
+  setStationStatus('Consultando AVAMET…');
+
+  // Comprobar caché reciente (30 min)
+  const saved = loadStationCache();
+  if(saved){
+    const ageMin = (Date.now() - (saved.appliedAt||0)) / 60000;
+    const todayStr = new Date().toISOString().slice(0,10);
+    if(saved.date === todayStr && ageMin < 30){
+      setInputsFromCache(saved);
+      applyStationInput(saved);
+      setStationStatus(`AVAMET · hace ${Math.round(ageMin)} min`);
+      btn.disabled = false; btn.textContent = '☁ Leer AVAMET';
+      return;
+    }
+  }
+
+  let html = null;
+
+  // Intentar directo primero, luego cada proxy
+  const urls = [AVAMET_URL, ...CORS_PROXIES.map(p => p + encodeURIComponent(AVAMET_URL))];
+
+  for(const url of urls){
+    try{
+      const r = await fetch(url, {cache:'no-store'});
+      if(r.ok){
+        const text = await r.text();
+        if(text && text.length > 200){ html = text; break; }
+      }
+    }catch(e){
+      console.warn('fetchAvamet attempt failed:', e.message);
+    }
+  }
+
+  if(html){
+    const data = parseAvametHTML(html);
+    if(data.rainMM !== null){
+      // Intentar también leer datos de días previos (mx-dia.php)
+      try {
+        const diaData = await fetchAvametDia();
+        if(diaData.ayer !== null)  data.rainAyer = diaData.ayer;
+        if(diaData.ant  !== null)  data.rainAnt  = diaData.ant;
+      } catch(e) { console.warn('fetchAvametDia failed:', e.message); }
+
+      // Rellenar los inputs con los datos leídos
+      const inputMM = document.getElementById('st-input-mm');
+      const inputMonth = document.getElementById('st-input-month');
+      inputMM.value = data.rainMM;
+      if(data.rainMonthMM !== null) inputMonth.value = data.rainMonthMM;
+      if(data.rainAyer != null) document.getElementById('st-input-ayer').value = data.rainAyer;
+      if(data.rainAnt  != null) document.getElementById('st-input-ant').value  = data.rainAnt;
+      inputMM.dispatchEvent(new Event('input'));
+      inputMonth.dispatchEvent(new Event('input'));
+      // Aplicar automáticamente
+      applyStationInput(data);
+      btn.disabled = false;
+      btn.textContent = '☁ Leer AVAMET';
+      return;
+    }
+  }
+
+  // Fallback — caché
+  if(loadStationCache()){
+    setStationStatus('Sin conexión · mostrando datos guardados');
+  } else {
+    setStationStatus('No accesible — introduce manualmente');
+    document.getElementById('station-note').textContent =
+      'No se pudo conectar con AVAMET. Abre la página con el enlace de abajo, anota los mm de lluvia de hoy e introdúcelos manualmente.';
+  }
+  btn.disabled = false;
+  btn.textContent = '↺ Reintentar';
+}
+
+async function fetchAvametDia(){
+  // mx-dia.php tiene tabla con precipitación de los últimos 30 días
+  const DIA_URL = 'https://www.avamet.org/mx-dia.php?id=c30m082e24';
+  const urls = [DIA_URL, ...CORS_PROXIES.map(p => p + encodeURIComponent(DIA_URL))];
+  let html = null;
+  for(const url of urls){
+    try{
+      const r = await fetch(url, {cache:'no-store'});
+      if(r.ok){ const t = await r.text(); if(t && t.length > 500){ html = t; break; } }
+    }catch(e){}
+  }
+  if(!html) return {ayer: null, ant: null};
+
+  // La tabla tiene filas como: "07-05-2026 | ... | 62,2"
+  // Extraer las dos primeras filas de datos diarios (ayer y antesdeayer)
+  const toNum = s => s ? parseFloat(s.replace(',','.')) : null;
+  // Buscar patrón dd-mm-yyyy ... número al final de la fila (precipitación total)
+  const rowReg = /(\d{2}-\d{2}-\d{4})[^|]*?(?:\|\s*[\d,\.]+){16,}\|\s*([\d,\.]+)/g;
+  const matches = [];
+  let m;
+  while((m = rowReg.exec(html)) !== null && matches.length < 3){
+    matches.push({date: m[1], rain: toNum(m[2])});
+  }
+
+  // Alternativamente buscar las filas de la tabla más directamente
+  // Cada fila tiene la fecha y en la última columna la precipitación total
+  if(matches.length < 2){
+    // Fallback: regex más simple buscando el patrón de fecha + último número de la fila
+    const rows = html.match(/\d{2}-\d{2}-\d{4}[\s\S]*?(?=\d{2}-\d{2}-\d{4}|Dades mensuals)/g) || [];
+    matches.length = 0;
+    for(const row of rows.slice(0,3)){
+      const dateM = row.match(/(\d{2}-\d{2}-\d{4})/);
+      // Buscar último número con decimales en la fila (precipitación)
+      const nums = [...row.matchAll(/([\d,\.]+)/g)].map(x => x[1]);
+      // La precipitación total suele ser la penúltima o última columna numérica
+      const rain = nums.length > 15 ? toNum(nums[nums.length - 3]) : null;
+      if(dateM) matches.push({date: dateM[1], rain});
+    }
+  }
+
+  return {
+    ayer: matches[0]?.rain ?? null,
+    ant:  matches[1]?.rain ?? null,
+  };
+}
+
+function parseAvametHTML(html){
+  // La página MXO de AVAMET incluye texto como:
+  // "Pluja hui\n  0,2mm" / "Pluja hui  0.2mm"
+  // "Pluja mensual\n  68,6mm"
+  // Buscamos estos patrones (valenciano y castellano)
+  const toNum = s => s ? parseFloat(s.replace(',','.')) : null;
+
+  let rainMM = null, rainMonthMM = null, tempC = null, windKmh = null;
+
+  // Lluvia hoy — "Pluja hui" o "Lluvia hoy"
+  let m = html.match(/(?:Pluja hui|Lluvia hoy|Pluja avui)[^<\d]*?([\d,\.]+)\s*mm/i);
+  if(m) rainMM = toNum(m[1]);
+
+  // Lluvia mensual — "Pluja mensual" o "Lluvia mensual"
+  m = html.match(/(?:Pluja mensual|Lluvia mensual)[^<\d]*?([\d,\.]+)\s*mm/i);
+  if(m) rainMonthMM = toNum(m[1]);
+
+  // Temperatura actual
+  m = html.match(/<\/div>\s*([\d,\.]+)°/);
+  if(!m) m = html.match(/([\d,\.]+)°\s*(?:\n|<)/);
+  if(m) tempC = toNum(m[1]);
+
+  // Viento
+  m = html.match(/(?:Vent|Viento)[^<\d]*?([\d,\.]+)\s*km\/h/i);
+  if(m) windKmh = toNum(m[1]);
+
+  return {rainMM, rainMonthMM, tempC, windKmh};
+}
+
+// ============================================================
+// ESTACIÓN LOCAL — ENTRADA MANUAL / PERSISTENCIA
+// Abre meteoxabia.com/golf.htm, copia los mm y aplica aquí.
+// Persiste en localStorage para no tener que reintroducir cada vez.
+// ============================================================
+const FIELD_M2 = 540000; // m² aprox. superficie en riego — ajustar si lo sabes exacto
+const STATION_CACHE_KEY = 'riego_station_v2';
+
+let stationRainMM = null;
+
+function mmToM3(mm){ return Math.round((mm * FIELD_M2) / 1000); }
+
+function loadStationCache(){
+  try{
+    const raw = localStorage.getItem(STATION_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+function saveStationCache(data){
+  localStorage.setItem(STATION_CACHE_KEY, JSON.stringify(data));
+}
+
+function setInputsFromCache(data){
+  const inputMM = document.getElementById('st-input-mm');
+  const inputMonth = document.getElementById('st-input-month');
+  const inputAyer = document.getElementById('st-input-ayer');
+  const inputAnt  = document.getElementById('st-input-ant');
+  if(data.rainMM != null)    { inputMM.value    = data.rainMM;    inputMM.dispatchEvent(new Event('input')); }
+  if(data.rainMonthMM != null){ inputMonth.value = data.rainMonthMM; inputMonth.dispatchEvent(new Event('input')); }
+  if(data.rainAyer != null)  { inputAyer.value  = data.rainAyer; }
+  if(data.rainAnt  != null)  { inputAnt.value   = data.rainAnt;  }
+}
+
+function initStationPanel(){
+  // Listeners para recalcular al cambiar ayer/antesdeayer
+  document.getElementById('st-input-ayer').addEventListener('input', ()=>recompute());
+  document.getElementById('st-input-ant').addEventListener('input',  ()=>recompute());
+  const inputMM    = document.getElementById('st-input-mm');
+  const inputMonth = document.getElementById('st-input-month');
+
+  // Restaurar último valor guardado
+  const saved = loadStationCache();
+  const todayStr = new Date().toISOString().slice(0,10);
+  if(saved && saved.date === todayStr){
+    setInputsFromCache(saved);
+    stationRainMM = saved.rainMM;
+    renderStationUI(saved);
+    // Si los datos tienen más de 30 min, refrescar en background
+    const ageMin = (Date.now() - (saved.appliedAt||0)) / 60000;
+    if(ageMin > 30) setTimeout(()=>fetchAvamet(), 2000);
+  } else {
+    // Sin datos de hoy — intentar AVAMET automáticamente al arrancar
+    if(saved && saved.rainMonthMM != null){
+      document.getElementById('st-input-month').value = saved.rainMonthMM;
+    }
+    setTimeout(()=>fetchAvamet(), 1500);
+  }
+
+  // Actualizar sub-label en tiempo real al escribir
+  inputMM.addEventListener('input', ()=>{
+    const v = parseFloat(inputMM.value);
+    const sub = document.getElementById('st-rain-m3-display');
+    sub.textContent = (!isNaN(v) && v > 0) ? `≈ ${mmToM3(v).toLocaleString('es-ES')} m³ sobre el campo` : '';
+  });
+
+  inputMonth.addEventListener('input', ()=>{
+    const v = parseFloat(inputMonth.value);
+    const sub = document.getElementById('st-month-display');
+    sub.textContent = (!isNaN(v) && v > 0) ? `≈ ${mmToM3(v).toLocaleString('es-ES')} m³ acum.` : '';
+  });
+
+  // Disparar input event para mostrar sub si ya hay valor
+  inputMM.dispatchEvent(new Event('input'));
+  inputMonth.dispatchEvent(new Event('input'));
+}
+
+function applyStationInput(autoData){
+  const inputMM    = document.getElementById('st-input-mm');
+  const inputMonth = document.getElementById('st-input-month');
+  const mm    = autoData?.rainMM    ?? parseFloat(inputMM.value);
+  const month = autoData?.rainMonthMM ?? parseFloat(inputMonth.value);
+  const ayer  = parseFloat(document.getElementById('st-input-ayer').value);
+  const ant   = parseFloat(document.getElementById('st-input-ant').value);
+
+  if(isNaN(mm) || mm < 0){
+    setStationStatus('Introduce un valor válido de mm');
+    return;
+  }
+
+  const todayStr = new Date().toISOString().slice(0,10);
+  const data = {
+    date: todayStr,
+    rainMM: mm,
+    rainMonthMM: isNaN(month) ? null : month,
+    rainAyer: isNaN(ayer) ? null : ayer,
+    rainAnt:  isNaN(ant)  ? null : ant,
+    appliedAt: Date.now()
+  };
+
+  saveStationCache(data);
+  stationRainMM = mm;
+  renderStationUI(data);
+  recompute();
+}
+
+function renderStationUI(data){
+  const timeStr = new Date(data.appliedAt).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  setStationStatus(`${data.date} · ${timeStr}`);
+
+  document.getElementById('st-rain-m3-display').textContent =
+    data.rainMM > 0 ? `≈ ${mmToM3(data.rainMM).toLocaleString('es-ES')} m³ sobre el campo` : 'Sin lluvia hoy';
+
+  if(data.rainMonthMM != null){
+    document.getElementById('st-month-display').textContent =
+      `≈ ${mmToM3(data.rainMonthMM).toLocaleString('es-ES')} m³ acum.`;
+  }
+
+  const badge = document.getElementById('station-applied');
+  badge.classList.toggle('show', data.rainMM != null);
+
+  document.getElementById('station-note').textContent =
+    data.rainMM > 0
+      ? `${data.rainMM} mm hoy aplicados (${mmToM3(data.rainMM).toLocaleString('es-ES')} m³). Introduce lluvia de ayer y antesdeayer para afinar el factor de 3 días.`
+      : `0 mm hoy. Introduce lluvia de ayer y antesdeayer si las hubo para que el factor de 3 días sea correcto.`;
+}
+
+function setStationStatus(msg){
+  const el = document.getElementById('station-status');
+  if(el) el.textContent = msg;
+}
+
+// ============================================================
+// Boot
+initMonthSelect();
+initToggle();
+initInputs();
+initRefresh();
+initInstallBanner();
+initServiceWorker();
+initLog();
+initStationPanel();
+fetchWeather();
+
+// Refresh meteo if user returns to tab
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden){
+    const cached = localStorage.getItem(CACHE_KEY);
+    if(cached){
+      try{
+        const obj = JSON.parse(cached);
+        const ageMin = (Date.now() - obj.ts) / 60000;
+        if(ageMin > CACHE_TTL_MIN) fetchWeather(true);
+      }catch(e){}
+    }
+  }
+});
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d4d2c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Riego Jávea">
+<title>Riego — Club de Golf Jávea</title>
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%230d4d2c'/><text x='50' y='68' font-size='60' text-anchor='middle' fill='%23fff'>💧</text></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%230d4d2c'/><text x='50' y='68' font-size='60' text-anchor='middle' fill='%23fff'>💧</text></svg>">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700;900&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#0a1410;
+  --bg2:#0f1d17;
+  --panel:#142621;
+  --panel2:#1a2f28;
+  --line:rgba(255,255,255,0.08);
+  --line2:rgba(255,255,255,0.14);
+  --text:#e8efe9;
+  --text-dim:#9aaaa1;
+  --text-faint:#6b7872;
+  --accent:#5cd28d;
+  --accent-dim:#3a8d5b;
+  --warn:#ffb84d;
+  --danger:#ff6b6b;
+  --info:#7fc4ff;
+  --gold:#d4a857;
+  --shadow:0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.25);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:16px;line-height:1.45;min-height:100vh;overscroll-behavior-y:contain}
+body{
+  background:
+    radial-gradient(ellipse at top, rgba(92,210,141,0.05), transparent 60%),
+    radial-gradient(ellipse at bottom, rgba(127,196,255,0.04), transparent 50%),
+    var(--bg);
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.app{max-width:560px;margin:0 auto;padding:0 16px 32px}
+
+/* HEADER */
+header{padding:24px 4px 20px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand .eyebrow{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-faint)}
+.brand h1{font-family:'Fraunces',serif;font-weight:900;font-size:26px;line-height:1.05;letter-spacing:-0.02em}
+.brand h1 em{font-style:italic;font-weight:500;color:var(--accent)}
+.location{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);text-align:right;line-height:1.5}
+.location strong{color:var(--text-dim);display:block;letter-spacing:0.05em}
+
+/* SECTIONS */
+section{margin-bottom:22px}
+.section-title{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-faint);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.section-title::before{content:"";display:inline-block;width:18px;height:1px;background:var(--accent-dim)}
+.section-title .num{color:var(--accent);font-weight:700}
+
+/* WEATHER PANEL */
+.weather{background:linear-gradient(180deg,var(--panel) 0%,var(--panel2) 100%);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
+.weather-status{display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);margin-bottom:12px;letter-spacing:0.05em}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text-faint);margin-right:6px;vertical-align:middle}
+.dot.live{background:var(--accent);box-shadow:0 0 8px var(--accent);animation:pulse 2s infinite}
+.dot.error{background:var(--danger)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.weather-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.metric{padding:10px 12px;background:rgba(0,0,0,0.25);border:1px solid var(--line);border-radius:10px}
+.metric-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);margin-bottom:2px}
+.metric-value{font-family:'Fraunces',serif;font-weight:700;font-size:22px;letter-spacing:-0.02em}
+.metric-value .unit{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:var(--text-dim);margin-left:4px}
+.metric-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);margin-top:2px}
+
+.weather-source{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);display:flex;justify-content:space-between;letter-spacing:0.05em}
+.btn-refresh{background:transparent;border:none;color:var(--accent);font-family:inherit;font-size:9px;letter-spacing:0.1em;cursor:pointer;padding:0}
+.btn-refresh:active{opacity:0.6}
+
+/* INPUTS */
+.inputs{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px;box-shadow:var(--shadow)}
+.input-row{display:flex;justify-content:space-between;align-items:center;padding:14px 12px;border-bottom:1px solid var(--line)}
+.input-row:last-child{border-bottom:none}
+.input-row label{flex:1;font-size:14px;color:var(--text)}
+.input-row .hint{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);margin-top:2px;letter-spacing:0.02em}
+.input-row input,.input-row select{background:rgba(0,0,0,0.3);border:1px solid var(--line2);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;padding:8px 12px;border-radius:8px;width:90px;text-align:center;outline:none;transition:border-color .15s}
+.input-row input:focus,.input-row select:focus{border-color:var(--accent)}
+.input-row input::-webkit-outer-spin-button,.input-row input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.input-row input[type=number]{-moz-appearance:textfield}
+.toggle{display:flex;background:rgba(0,0,0,0.3);border:1px solid var(--line2);border-radius:8px;padding:2px;gap:2px}
+.toggle button{background:transparent;border:none;color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;padding:6px 14px;border-radius:6px;cursor:pointer;letter-spacing:0.05em}
+.toggle button.active{background:var(--accent);color:#0a1410}
+
+/* RESULT */
+.result{background:linear-gradient(135deg,rgba(92,210,141,0.08) 0%,rgba(13,77,44,0.15) 100%);border:1px solid var(--accent-dim);border-radius:16px;padding:24px 20px;margin-top:8px;text-align:center;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.result::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+.result-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+.result-value{font-family:'Fraunces',serif;font-weight:900;font-size:64px;line-height:1;letter-spacing:-0.04em;color:var(--text);margin-bottom:4px}
+.result-value .unit{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:500;color:var(--text-dim);margin-left:4px;letter-spacing:0.05em}
+.result-sub{font-family:'Inter',sans-serif;font-size:13px;color:var(--text-dim);font-style:italic;margin-top:6px;line-height:1.4}
+.result-pct{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-faint);margin-top:10px;padding:3px 10px;border:1px solid var(--line2);border-radius:99px;letter-spacing:0.05em}
+
+/* FACTORS BREAKDOWN */
+.factors{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:14px}
+.factor{padding:8px 6px;background:rgba(0,0,0,0.25);border:1px solid var(--line);border-radius:8px;text-align:center}
+.factor-label{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--text-faint);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:2px}
+.factor-value{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--text)}
+.factor-value.up{color:var(--warn)}
+.factor-value.down{color:var(--info)}
+.factor-value.neutral{color:var(--text-dim)}
+
+/* ALERTS */
+.alerts{margin-top:14px;display:flex;flex-direction:column;gap:6px}
+.alert{padding:10px 12px;background:rgba(0,0,0,0.25);border-left:3px solid var(--accent-dim);border-radius:6px;font-size:12px;line-height:1.4;color:var(--text-dim)}
+.alert.warn{border-left-color:var(--warn)}
+.alert.danger{border-left-color:var(--danger)}
+.alert.info{border-left-color:var(--info)}
+.alert strong{color:var(--text);font-weight:600;display:block;margin-bottom:2px;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;font-family:'JetBrains Mono',monospace}
+
+/* MONTH TABLE */
+.month-table{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.month-table table{width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:11px}
+.month-table th{padding:10px 8px;text-align:left;font-weight:600;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);background:rgba(0,0,0,0.25);border-bottom:1px solid var(--line)}
+.month-table td{padding:9px 8px;border-bottom:1px solid var(--line);color:var(--text-dim)}
+.month-table tr:last-child td{border-bottom:none}
+.month-table tr.peak td{background:rgba(255,184,77,0.04);color:var(--text)}
+.month-table tr.current td{background:rgba(92,210,141,0.08);color:var(--text)}
+.month-table tr.current td:first-child{color:var(--accent);font-weight:700}
+.month-table .num{text-align:right;font-weight:600}
+
+/* LOG REGISTRY */
+.log-form{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+.log-row{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line)}
+.log-row:last-of-type{border-bottom:none}
+.log-row label{flex:1;font-size:13px;color:var(--text)}
+.log-row label .hint{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);margin-top:2px;letter-spacing:0.02em}
+.log-row input[type=number],.log-row input[type=date]{background:rgba(0,0,0,0.3);border:1px solid var(--line2);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;padding:8px 10px;border-radius:8px;width:130px;text-align:center;outline:none;transition:border-color .15s}
+.log-row input[type=date]{width:150px;font-size:12px}
+.log-row input:focus{border-color:var(--accent)}
+.log-row input::-webkit-outer-spin-button,.log-row input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.log-computed{padding:14px 12px;background:rgba(92,210,141,0.06);border:1px solid var(--accent-dim);border-radius:10px;margin-top:10px;display:flex;justify-content:space-between;align-items:center}
+.log-computed-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent)}
+.log-computed-value{font-family:'Fraunces',serif;font-weight:700;font-size:24px;letter-spacing:-0.02em}
+.log-computed-value .unit{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim);margin-left:4px}
+.log-actions{display:flex;gap:8px;margin-top:12px}
+.btn-primary,.btn-secondary{flex:1;padding:11px;border:none;border-radius:10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:0.02em;transition:opacity .15s}
+.btn-primary{background:var(--accent);color:#0a1410}
+.btn-secondary{background:rgba(255,255,255,0.05);color:var(--text-dim);border:1px solid var(--line2)}
+.btn-primary:active,.btn-secondary:active{opacity:0.7}
+.log-msg{padding:10px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.05em;border-radius:8px;margin-top:10px;display:none}
+.log-msg.show{display:block}
+.log-msg.success{background:rgba(92,210,141,0.12);color:var(--accent);border:1px solid var(--accent-dim)}
+.log-msg.error{background:rgba(255,107,107,0.12);color:var(--danger);border:1px solid rgba(255,107,107,0.3)}
+
+/* LOG STATS */
+.log-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.log-stat{padding:10px 8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;text-align:center}
+.log-stat-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px}
+.log-stat-value{font-family:'Fraunces',serif;font-weight:700;font-size:18px;color:var(--text)}
+.log-stat-value .unit{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);margin-left:2px;font-weight:500}
+.log-stat-sub{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);margin-top:2px;letter-spacing:0.05em}
+
+/* LOG MONTHLY VIEW */
+.log-month-view{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.log-month-header{padding:12px 14px;background:rgba(0,0,0,0.25);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.log-month-title{font-family:'Fraunces',serif;font-size:16px;font-weight:700;color:var(--text)}
+.log-month-nav{display:flex;gap:4px}
+.log-month-nav button{background:rgba(255,255,255,0.05);border:1px solid var(--line2);color:var(--text-dim);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.log-month-nav button:disabled{opacity:0.3;cursor:not-allowed}
+.log-month-nav button:active:not(:disabled){background:rgba(255,255,255,0.1)}
+.log-month-summary{padding:12px 14px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(92,210,141,0.04) 0%,transparent 100%)}
+.log-month-summary-item{}
+.log-month-summary-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);margin-bottom:2px}
+.log-month-summary-value{font-family:'Fraunces',serif;font-size:20px;font-weight:700;letter-spacing:-0.01em}
+.log-month-summary-value .unit{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:var(--text-dim);margin-left:3px}
+.log-month-summary-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);margin-top:1px}
+.delta-up{color:var(--warn)}
+.delta-down{color:var(--info)}
+.delta-eq{color:var(--text-dim)}
+
+.log-list{max-height:340px;overflow-y:auto}
+.log-list-empty{padding:30px 14px;text-align:center;color:var(--text-faint);font-size:13px;font-style:italic}
+.log-entry{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.log-entry:last-child{border-bottom:none}
+.log-entry-date{color:var(--text-dim);min-width:90px}
+.log-entry-date strong{color:var(--text);display:block;font-size:13px}
+.log-entry-counters{flex:1;color:var(--text-faint);font-size:10px;text-align:right}
+.log-entry-m3{font-weight:700;color:var(--text);min-width:60px;text-align:right;font-size:14px}
+.log-entry-m3.zero{color:var(--text-faint);font-weight:500}
+.log-entry-del{background:transparent;border:none;color:var(--text-faint);font-size:14px;cursor:pointer;padding:4px 6px;border-radius:4px;opacity:0.5}
+.log-entry-del:active{opacity:1;color:var(--danger)}
+
+/* FOOTER */
+footer{margin-top:30px;padding:20px 4px 0;border-top:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);line-height:1.6;letter-spacing:0.02em}
+footer p{margin-bottom:6px}
+footer a{color:var(--text-dim);text-decoration:none;border-bottom:1px dotted var(--text-faint)}
+
+/* ESTACIÓN LOCAL METEOXABIA */
+.meteo-local{background:linear-gradient(180deg,rgba(127,196,255,0.07) 0%,rgba(13,77,44,0.10) 100%);border:1px solid rgba(127,196,255,0.25);border-radius:14px;padding:14px;box-shadow:var(--shadow);margin-top:10px}
+.meteo-local-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.meteo-local-title{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--info)}
+.meteo-local-status{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint)}
+.station-input-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.station-input-group{display:flex;flex-direction:column;gap:3px}
+.station-input-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-faint)}
+.station-input-wrap{position:relative;display:flex;align-items:center}
+.station-input-wrap input{width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(127,196,255,0.3);color:var(--text);font-family:'Fraunces',serif;font-weight:700;font-size:22px;padding:8px 36px 8px 10px;border-radius:8px;outline:none;transition:border-color .15s}
+.station-input-wrap input:focus{border-color:var(--info)}
+.station-input-wrap input::-webkit-outer-spin-button,.station-input-wrap input::-webkit-inner-spin-button{-webkit-appearance:none}
+.station-input-wrap input[type=number]{-moz-appearance:textfield}
+.station-input-unit{position:absolute;right:10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-faint);pointer-events:none}
+.station-input-sub{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--info);min-height:13px}
+.meteo-local-actions{display:flex;gap:6px;flex-wrap:wrap}
+.btn-station{background:rgba(127,196,255,0.15);border:1px solid rgba(127,196,255,0.35);color:var(--info);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:8px 12px;border-radius:8px;cursor:pointer;letter-spacing:0.08em;transition:background .15s;flex:1;text-align:center}
+.btn-station:active{background:rgba(127,196,255,0.28)}
+.btn-station-link{background:transparent;border:1px solid var(--line2);color:var(--text-faint);font-family:'JetBrains Mono',monospace;font-size:10px;padding:8px 12px;border-radius:8px;cursor:pointer;letter-spacing:0.06em;text-decoration:none;display:inline-block;flex:1;text-align:center}
+.meteo-local-note{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-faint);margin-top:8px;line-height:1.5;letter-spacing:0.03em}
+.station-applied{background:rgba(127,196,255,0.08);border:1px solid rgba(127,196,255,0.2);border-radius:6px;padding:5px 10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--info);margin-top:6px;text-align:center;display:none}
+.station-applied.show{display:block}
+
+/* INSTALL BANNER */
+.install-banner{position:fixed;left:16px;right:16px;bottom:16px;max-width:560px;margin:0 auto;background:var(--accent);color:#0a1410;padding:12px 16px;border-radius:12px;display:none;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.5);z-index:100;font-size:13px;font-weight:600}
+.install-banner.show{display:flex}
+.install-banner button{background:#0a1410;color:var(--accent);border:none;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;padding:8px 14px;border-radius:6px;letter-spacing:0.05em;cursor:pointer}
+.install-banner .close{background:transparent;color:#0a1410;padding:4px 8px;font-size:18px}
+
+/* Responsive tweaks */
+@media (max-width:380px){
+  .result-value{font-size:54px}
+  .brand h1{font-size:22px}
+  .weather-grid{grid-template-columns:1fr 1fr}
+}
+
+/* Subtle entrance animation */
+.fade-in{animation:fadeIn .4s ease-out backwards}
+.fade-in:nth-child(1){animation-delay:0s}
+.fade-in:nth-child(2){animation-delay:.05s}
+.fade-in:nth-child(3){animation-delay:.1s}
+.fade-in:nth-child(4){animation-delay:.15s}
+.fade-in:nth-child(5){animation-delay:.2s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* Loading skeleton */
+.skeleton{background:linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0.04) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;color:transparent !important;display:inline-block;min-width:60px;height:1em}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="fade-in">
+    <div class="brand">
+      <span class="eyebrow">Plan de riego 2026</span>
+      <h1>Club de Golf <em>Jávea</em></h1>
+    </div>
+    <div class="location">
+      <strong>Ctra. Jávea-Benitachell</strong>
+      38.75°N · 0.15°E<br>
+      Ele. 50 m · km 4,5
+    </div>
+  </header>
+
+  <section class="fade-in">
+    <div class="section-title"><span class="num">01</span> Meteo del día</div>
+    <div class="weather">
+      <div class="weather-status">
+        <span><span class="dot" id="status-dot"></span><span id="status-text">Cargando…</span></span>
+        <span id="forecast-day">—</span>
+      </div>
+      <div class="weather-grid">
+        <div class="metric">
+          <div class="metric-label">Tmax / Tmin</div>
+          <div class="metric-value"><span id="m-tmax" class="skeleton">—</span><span class="unit">/ <span id="m-tmin">—</span> °C</span></div>
+          <div class="metric-sub" id="m-temp-sub">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Lluvia hoy</div>
+          <div class="metric-value"><span id="m-rain" class="skeleton">—</span><span class="unit">mm</span></div>
+          <div class="metric-sub" id="m-rain-sub">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Lluvia 3 días previos</div>
+          <div class="metric-value"><span id="m-rain3" class="skeleton">—</span><span class="unit">mm</span></div>
+          <div class="metric-sub" id="m-rain3-sub">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Viento máx. / rachas</div>
+          <div class="metric-value"><span id="m-wind" class="skeleton">—</span><span class="unit">km/h</span></div>
+          <div class="metric-sub" id="m-wind-sub">—</div>
+        </div>
+      </div>
+      <div class="weather-source">
+        <span>Fuente: Open-Meteo · ECMWF</span>
+        <button class="btn-refresh" id="btn-refresh">↻ Actualizar</button>
+      </div>
+    </div>
+
+    <!-- ESTACIÓN LOCAL AVAMET -->
+    <div class="meteo-local">
+      <div class="meteo-local-header">
+        <span class="meteo-local-title">🌧 Estación Golf · AVAMET</span>
+        <span class="meteo-local-status" id="station-status">Sin datos</span>
+      </div>
+      <div class="station-input-row">
+        <div class="station-input-group">
+          <label class="station-input-label" for="st-input-mm">Lluvia hoy en el campo (mm)</label>
+          <div class="station-input-wrap">
             <input type="number" id="st-input-mm" placeholder="0.0" step="0.1" min="0" inputmode="decimal">
             <span class="station-input-unit">mm</span>
           </div>
