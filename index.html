@@ -298,10 +298,10 @@ footer a{color:var(--text-dim);text-decoration:none;border-bottom:1px dotted var
       </div>
     </div>
 
-    <!-- ESTACIÓN LOCAL METEOXABIA -->
+    <!-- ESTACIÓN LOCAL AVAMET -->
     <div class="meteo-local">
       <div class="meteo-local-header">
-        <span class="meteo-local-title">🌧 Estación Golf · Meteoxabia</span>
+        <span class="meteo-local-title">🌧 Estación Golf · AVAMET</span>
         <span class="meteo-local-status" id="station-status">Sin datos</span>
       </div>
       <div class="station-input-row">
@@ -323,11 +323,12 @@ footer a{color:var(--text-dim);text-decoration:none;border-bottom:1px dotted var
         </div>
       </div>
       <div class="meteo-local-actions" style="margin-top:8px">
-        <button class="btn-station" id="btn-station-apply" onclick="applyStationInput()">✓ Aplicar al cálculo</button>
-        <a class="btn-station-link" href="https://www.meteoxabia.com/golf.htm" target="_blank">↗ Abrir meteoxabia</a>
+        <button class="btn-station" id="btn-station-read" onclick="fetchAvamet()">☁ Leer AVAMET</button>
+        <button class="btn-station" id="btn-station-apply" onclick="applyStationInput()" style="background:rgba(92,210,141,0.15);border-color:rgba(92,210,141,0.35);color:var(--accent)">✓ Aplicar</button>
+        <a class="btn-station-link" href="https://www.avamet.org/mxo_i.php?id=c30m082e24" target="_blank">↗ AVAMET</a>
       </div>
       <div class="station-applied" id="station-applied">✓ Lluvia de la estación local aplicada al cálculo</div>
-      <div class="meteo-local-note" id="station-note">Abre meteoxabia con el enlace de arriba, anota los mm de lluvia del campo, introdúcelos aquí y pulsa "Aplicar". El dato se guarda y tiene prioridad sobre Open-Meteo.</div>
+      <div class="meteo-local-note" id="station-note">Pulsa "Leer AVAMET" para obtener automáticamente los datos de lluvia de la estación del Club de Golf. Si falla, abre AVAMET con el enlace, anota los mm e introdúcelos manualmente.</div>
     </div>
   </section>
 
@@ -483,7 +484,7 @@ footer a{color:var(--text-dim);text-decoration:none;border-bottom:1px dotted var
 
   <footer>
     <p><strong>Datos meteorológicos:</strong> <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> (modelo ECMWF, resolución ~9 km). Actualiza cada hora.</p>
-    <p><strong>Estación local:</strong> <a href="https://www.meteoxabia.com/golf.htm" target="_blank">Meteoxabia · Club de Golf Jávea</a>. Prioridad sobre Open-Meteo para lluvia del día.</p>
+    <p><strong>Estación local:</strong> <a href="https://www.avamet.org/mxo_i.php?id=c30m082e24" target="_blank">AVAMET · Club de Golf Jávea</a>. Datos abiertos (CC BY-NC-ND). Prioridad sobre Open-Meteo para lluvia del día.</p>
     <p><strong>Calibración:</strong> Promedio de consumo real 2024-2025 (~83.000 m³/año) con factores de ajuste por lluvia, calor, viento y lavado.</p>
     <p><strong>Importante:</strong> Esta herramienta es orientativa. Decisión final siempre basada en observación directa del campo y datos de sondas si las hay.</p>
     <p style="margin-top:12px;color:var(--text-faint)">Funciona offline tras la primera carga · Datos meteo cacheados · Registros guardados en el dispositivo</p>
@@ -1217,7 +1218,100 @@ function initLog(){
 
 // ============================================================
 // ============================================================
-// ESTACIÓN LOCAL — ENTRADA MANUAL METEOXABIA
+// AVAMET — LECTURA AUTOMÁTICA ESTACIÓN CLUB DE GOLF JÁVEA
+// URL: https://www.avamet.org/mxo_i.php?id=c30m082e24
+// Datos abiertos AVAMET (CC BY-NC-ND 4.0)
+// ============================================================
+const AVAMET_URL = 'https://www.avamet.org/mxo_i.php?id=c30m082e24';
+const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+
+async function fetchAvamet(){
+  const btn = document.getElementById('btn-station-read');
+  btn.disabled = true;
+  btn.textContent = '⏳ Leyendo…';
+  setStationStatus('Consultando AVAMET…');
+
+  // Intentar primero directo, luego via proxy
+  let html = null;
+  const urls = [
+    AVAMET_URL,
+    CORS_PROXY + encodeURIComponent(AVAMET_URL),
+  ];
+
+  for(const url of urls){
+    try{
+      const r = await fetch(url, {cache:'no-store'});
+      if(r.ok){
+        html = await r.text();
+        if(html && html.length > 100) break;
+      }
+    }catch(e){
+      console.warn('fetchAvamet attempt failed:', e.message);
+    }
+  }
+
+  if(html){
+    const data = parseAvametHTML(html);
+    if(data.rainMM !== null){
+      // Rellenar los inputs con los datos leídos
+      const inputMM = document.getElementById('st-input-mm');
+      const inputMonth = document.getElementById('st-input-month');
+      inputMM.value = data.rainMM;
+      if(data.rainMonthMM !== null) inputMonth.value = data.rainMonthMM;
+      inputMM.dispatchEvent(new Event('input'));
+      inputMonth.dispatchEvent(new Event('input'));
+      // Aplicar automáticamente
+      applyStationInput(data);
+      btn.disabled = false;
+      btn.textContent = '☁ Leer AVAMET';
+      return;
+    }
+  }
+
+  // Fallback — caché
+  const saved = loadStationCache();
+  if(saved){
+    setStationStatus('Sin conexión · mostrando datos guardados');
+  } else {
+    setStationStatus('No accesible — introduce manualmente');
+    document.getElementById('station-note').textContent =
+      'No se pudo conectar con AVAMET. Abre la página con el enlace de abajo, anota los mm de lluvia de hoy e introdúcelos manualmente.';
+  }
+  btn.disabled = false;
+  btn.textContent = '↺ Reintentar';
+}
+
+function parseAvametHTML(html){
+  // La página MXO de AVAMET incluye texto como:
+  // "Pluja hui\n  0,2mm" / "Pluja hui  0.2mm"
+  // "Pluja mensual\n  68,6mm"
+  // Buscamos estos patrones (valenciano y castellano)
+  const toNum = s => s ? parseFloat(s.replace(',','.')) : null;
+
+  let rainMM = null, rainMonthMM = null, tempC = null, windKmh = null;
+
+  // Lluvia hoy — "Pluja hui" o "Lluvia hoy"
+  let m = html.match(/(?:Pluja hui|Lluvia hoy|Pluja avui)[^<\d]*?([\d,\.]+)\s*mm/i);
+  if(m) rainMM = toNum(m[1]);
+
+  // Lluvia mensual — "Pluja mensual" o "Lluvia mensual"
+  m = html.match(/(?:Pluja mensual|Lluvia mensual)[^<\d]*?([\d,\.]+)\s*mm/i);
+  if(m) rainMonthMM = toNum(m[1]);
+
+  // Temperatura actual
+  m = html.match(/<\/div>\s*([\d,\.]+)°/);
+  if(!m) m = html.match(/([\d,\.]+)°\s*(?:\n|<)/);
+  if(m) tempC = toNum(m[1]);
+
+  // Viento
+  m = html.match(/(?:Vent|Viento)[^<\d]*?([\d,\.]+)\s*km\/h/i);
+  if(m) windKmh = toNum(m[1]);
+
+  return {rainMM, rainMonthMM, tempC, windKmh};
+}
+
+// ============================================================
+// ESTACIÓN LOCAL — ENTRADA MANUAL / PERSISTENCIA
 // Abre meteoxabia.com/golf.htm, copia los mm y aplica aquí.
 // Persiste en localStorage para no tener que reintroducir cada vez.
 // ============================================================
@@ -1278,11 +1372,11 @@ function initStationPanel(){
   inputMonth.dispatchEvent(new Event('input'));
 }
 
-function applyStationInput(){
+function applyStationInput(autoData){
   const inputMM    = document.getElementById('st-input-mm');
   const inputMonth = document.getElementById('st-input-month');
-  const mm    = parseFloat(inputMM.value);
-  const month = parseFloat(inputMonth.value);
+  const mm    = autoData?.rainMM    ?? parseFloat(inputMM.value);
+  const month = autoData?.rainMonthMM ?? parseFloat(inputMonth.value);
 
   if(isNaN(mm) || mm < 0){
     setStationStatus('Introduce un valor válido de mm');
